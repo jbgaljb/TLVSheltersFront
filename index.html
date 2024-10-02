@@ -171,7 +171,7 @@
             // Add the closest shelter marker to the map
             closestShelterMarker = L.marker([closestShelterData.lat, closestShelterData.lon])
                 .addTo(map)
-                .bindPopup(`<strong>Closest Shelter: ${closestShelterData.location}</strong>`)
+                .bindPopup(`<strong>Closest Shelter: ${closestShelterData.location}</strong><br><a href="https://www.google.com/maps/dir/?api=1&destination=${closestShelterData.lat},${closestShelterData.lon}" target="_blank">Navigate with Google Maps</a>`)
                 .openPopup();
             map.setView([closestShelterData.lat, closestShelterData.lon], 13);
         };
@@ -217,6 +217,236 @@
     </script>
 </body>
 </html>
+
+
+
+
+
+
+
+
+
+
+
+<!-- <!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tel Aviv Shelters</title>
+    <link href="https://stackpath.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/toastify-js/1.11.2/toastify.min.css"/>
+    <style>
+        #map {
+            height: 500px;
+            width: 100%;
+        }
+        .header {
+            background-color: #007bff;
+            color: white;
+            padding: 15px;
+            text-align: center;
+        }
+        .buttons {
+            margin: 15px 0;
+            text-align: center;
+        }
+        .btn-custom {
+            margin: 5px;
+            padding: 10px 20px;
+            font-size: 1.1rem;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+    <div class="container-fluid">
+        <div class="row">
+            <div class="col-12 header">
+                <h1>Tel Aviv Shelters</h1>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-12 buttons">
+                <button class="btn btn-primary btn-custom" id="load-all-shelters">Load All Shelters</button>
+                <button class="btn btn-success btn-custom" id="closest-shelter">Closest Shelter</button>
+                <button class="btn btn-warning btn-custom" id="reset-map">Reset Map</button>
+            </div>
+        </div>
+        <div class="row">
+            <div class="col-12">
+                <div id="map"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.5.2/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/toastify-js/1.11.2/toastify.min.js"></script>
+    <script>
+        const map = L.map('map').setView([32.0853, 34.7818], 13); // Initial map coordinates
+        let shelterData = []; // To store fetched shelter data
+        let markers = []; // To keep track of markers added to the map
+        let markersLoaded = false; // Flag to ensure markers are loaded only once
+        let userLocationMarker = null; // Marker for user's location
+        let closestShelterData = null; // Store data of the closest shelter
+        let closestShelterMarker = null; // Store the marker for the closest shelter
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors',
+        }).addTo(map);
+
+        // Fetch shelter data on page load
+        const fetchShelterData = async () => {
+            try {
+                const response = await axios.get('https://tlvshelters.onrender.com');
+                shelterData = response.data; // Store the data for later use
+                console.log('Shelter data fetched and stored:', shelterData);
+
+                // Find user's location and determine the closest shelter
+                findUserLocationAndClosestShelter();
+            } catch (error) {
+                console.error('Error fetching shelter data:', error);
+            }
+        };
+
+        // Call the function on page load
+        window.onload = fetchShelterData;
+
+        // Haversine formula to calculate distance between two points
+        const calculateDistance = (lat1, lon1, lat2, lon2) => {
+            const R = 6371; // Radius of the earth in km
+            const dLat = (lat2 - lat1) * (Math.PI / 180);
+            const dLon = (lon2 - lon1) * (Math.PI / 180);
+            const a = 
+                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2); 
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); 
+            return R * c; // Distance in km
+        };
+
+        // Function to find the closest shelter
+        const findClosestShelter = (userLat, userLon) => {
+            let closestShelter = null;
+            let shortestDistance = Infinity;
+
+            shelterData.forEach(shelter => {
+                const distance = calculateDistance(userLat, userLon, shelter.lat, shelter.lon);
+                if (distance < shortestDistance) {
+                    shortestDistance = distance;
+                    closestShelter = shelter;
+                }
+            });
+            return closestShelter;
+        };
+
+        // Function to find user's location and determine the closest shelter
+        const findUserLocationAndClosestShelter = (renderAfterFinding = false) => {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(position => {
+                    const userLat = position.coords.latitude;
+                    const userLon = position.coords.longitude;
+
+                    // Store user's location marker
+                    if (userLocationMarker) {
+                        map.removeLayer(userLocationMarker);
+                    }
+                    userLocationMarker = L.marker([userLat, userLon])
+                        .addTo(map)
+                        .bindPopup("You are here");
+
+                    // Find the closest shelter and store it
+                    closestShelterData = findClosestShelter(userLat, userLon);
+
+                    if (closestShelterData) {
+                        console.log("Closest shelter found:", closestShelterData); // Log for debugging
+                        if (renderAfterFinding) {
+                            showClosestShelterMarker(); // Render immediately if needed
+                        }
+                    } else {
+                        console.error("No closest shelter found.");
+                    }
+
+                }, () => {
+                    Toastify({
+                        text: "Failed to get your location.",
+                        duration: 3000,
+                        gravity: "top",
+                        position: "center",
+                        backgroundColor: "#dc3545",
+                    }).showToast();
+                });
+            } else {
+                alert("Geolocation is not supported by this browser.");
+            }
+        };
+
+        // Render the closest shelter on the map when button is pressed
+        const showClosestShelterMarker = () => {
+            // Recalculate if `closestShelterData` is null
+            if (!closestShelterData) {
+                findUserLocationAndClosestShelter(true); // Pass true to render after finding
+                return; // Exit to allow time for recalculating
+            }
+
+            // Remove existing marker if it exists
+            if (closestShelterMarker) {
+                map.removeLayer(closestShelterMarker);
+            }
+
+            // Add the closest shelter marker to the map
+            closestShelterMarker = L.marker([closestShelterData.lat, closestShelterData.lon])
+                .addTo(map)
+                .bindPopup(`<strong>Closest Shelter: ${closestShelterData.location}</strong>`)
+                .openPopup();
+            map.setView([closestShelterData.lat, closestShelterData.lon], 13);
+        };
+
+        // Event listener for Closest Shelter button
+        document.getElementById('closest-shelter').addEventListener('click', showClosestShelterMarker);
+
+        // Reset map functionality
+        document.getElementById('reset-map').addEventListener('click', () => {
+            map.setView([32.0853, 34.7818], 13); // Reset the view to the original coordinates and zoom level
+            markers.forEach(marker => map.removeLayer(marker));
+            markers = []; // Clear the markers array
+            markersLoaded = false; // Reset the flag
+
+            if (userLocationMarker) {
+                map.removeLayer(userLocationMarker);
+                userLocationMarker = null;
+            }
+
+            if (closestShelterMarker) {
+                map.removeLayer(closestShelterMarker);
+                closestShelterMarker = null;
+            }
+
+            closestShelterData = null; // Reset the closest shelter data
+        });
+
+        // Function to add all markers to the map
+        const loadAllShelters = () => {
+            if (!markersLoaded && shelterData.length > 0) {
+                shelterData.forEach(shelter => {
+                    const marker = L.marker([shelter.lat, shelter.lon])
+                        .addTo(map)
+                        .bindPopup(`<strong>${shelter.location}</strong>`);
+                    markers.push(marker); // Store marker in the markers array
+                });
+                markersLoaded = true; // Set flag to prevent re-loading
+            }
+        };
+
+        // Event listener for Load All Shelters button
+        document.getElementById('load-all-shelters').addEventListener('click', loadAllShelters);
+    </script>
+</body>
+</html> -->
 
 
 
